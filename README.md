@@ -1,2 +1,94 @@
-# cutmix-semisup-seg
-Semi-supervised semantic segmentation needs strong, varied perturbations
+# Semi-supervised semantic segmentation needs strong, varied perturbations
+#### by Geoff French, Samuli Laine, Timo Aila, Michal Mackiewicz, Graham Finlayson
+Implementation of our [paper](https://arxiv.org/abs/1906.01916).
+
+
+Licensed under MIT license.
+
+
+## Requirements
+
+- Python >= 3.6
+- PyTorch >= 1.4
+- torchvision 0.5
+- OpenCV
+- Pillow
+- Scikit-image
+- Scikit-learn
+- click
+- tqdm
+- Jupyter notebook for the notebooks
+
+## Datasets
+
+You need to:
+
+1. Download/acquire the datsets
+2. Write the config file `semantic_segmentation.cfg` giving their paths
+3. Convert them if necessary; the CamVid, Cityscapes and ISIC 2017 datasets must be converted
+to a ZIP-based format prior to use. You must run the provided conversion utilities to create these ZIP files.
+
+Dataset preparation instructions can be found [here](./DATASETS.md).
+
+
+## Running the experiments
+
+We provide four programs for running experiments:
+
+- `train_seg_semisup_mask_mt.py`: mask driven consistency loss (the main experiment) 
+- `train_seg_semisup_aug_mt.py`: augmentation driven consistency loss; used to attempt to replicate the
+ ISIC 2017 baselines of [Li et al.](https://arxiv.org/abs/1808.03887)
+- `train_seg_semisup_ict.py`: Interpolation Consistency Training; a baseline for contrast with our main
+approach
+- `train_seg_semisup_vat_mt.py`: Virtual Adversarial Training adapted for semantic segmentation
+
+They can be configured via command line arguments that are described [here](./CMDLINE_OPTIONS.md).
+
+
+#### Shell scripts
+To replicate our results, we provide shell scripts to run our experiments.
+
+##### Cityscapes
+```
+> sh run_cityscapes_experiments.sh <run> <split_rng_seed>
+```
+where `<run>` is the name of the run and `<split_rng_seed>` is an integer RNG seed used to select
+the supervised samples. Please see the comments
+at the top of `run_cityscapes_experiments.sh` for further explanation.
+  
+##### Pascal VOC 2012 (augmented)
+```
+> sh run_pascal_aug_experiments.sh <n_supervised> <n_supervised_txt>
+```
+where `<n_supervised>` is the number of supervised samples and `<n_supervised_txt>` is that number as text.
+Please see the comments at the top of `run_pascal_aug_experiments.sh` for further explanation.
+
+##### Pascal VOC 2012 (augmented) with DeepLab v3+
+```
+> sh run_pascal_aug_deeplab3plus_experiments.sh <n_supervised> <n_supervised_txt>
+```
+
+##### ISIC 2017 Segmentation
+```
+> sh run_isic2017_experiments.sh <run> <split_rng_seed>
+```
+where `<run>` is the name of the run and `<split_rng_seed>` is an integer RNG seed used to select
+the supervised samples. Please see the comments
+at the top of `run_isic2017_experiments.sh` for further explanation.
+
+
+## Exploring the input data distribution present in semantic segmentation problems
+
+#### Cluster assumption
+First we examine the input data distribution presented by semantic segmentation problems
+with a view to determining if the low density separation assumption holds,
+in the notebook `Semantic segmentation input data distribution.ipynb`
+This notebook also contains the code used to generate the images from Figure 1 in the paper.
+
+#### Inter-class and intra-class variance
+Secondly we examine the inter-class and intra-class distance (as a proxy for inter-class and intra-class variance)
+in the notebook `Plot inter-class and intra-class distances from files.ipynb`
+
+Note that running the second notebook requires that you generate some data files using the
+`intra_inter_class_patch_dist.py` program.
+
