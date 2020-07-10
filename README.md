@@ -18,6 +18,7 @@ Licensed under MIT license.
 - click
 - tqdm
 - Jupyter notebook for the notebooks
+- numpy 1.18
 
 ## Datasets
 
@@ -55,6 +56,16 @@ To replicate our results, we provide shell scripts to run our experiments.
 where `<run>` is the name of the run and `<split_rng_seed>` is an integer RNG seed used to select
 the supervised samples. Please see the comments
 at the top of `run_cityscapes_experiments.sh` for further explanation.
+
+To re-create the 5 runs we used for our experiments:
+
+```
+> sh run_cityscapes_experiments.sh 01 12345
+> sh run_cityscapes_experiments.sh 02 23456
+> sh run_cityscapes_experiments.sh 03 34567
+> sh run_cityscapes_experiments.sh 04 45678
+> sh run_cityscapes_experiments.sh 05 56789
+```
   
 ##### Pascal VOC 2012 (augmented)
 ```
@@ -62,6 +73,9 @@ at the top of `run_cityscapes_experiments.sh` for further explanation.
 ```
 where `<n_supervised>` is the number of supervised samples and `<n_supervised_txt>` is that number as text.
 Please see the comments at the top of `run_pascal_aug_experiments.sh` for further explanation.
+
+We use the same data split as [Mittal et al.](https://arxiv.org/abs/1908.05724) It is stored in 
+`data/splits/pascal_aug/split_0.pkl` that is included in the repo.
 
 ##### Pascal VOC 2012 (augmented) with DeepLab v3+
 ```
@@ -76,6 +90,19 @@ where `<run>` is the name of the run and `<split_rng_seed>` is an integer RNG se
 the supervised samples. Please see the comments
 at the top of `run_isic2017_experiments.sh` for further explanation.
 
+To re-create the 5 runs we used for our experiments: 
+
+```
+> sh run_isic2017_experiments.sh 01 12345
+> sh run_isic2017_experiments.sh 02 23456
+> sh run_isic2017_experiments.sh 07 78901
+> sh run_isic2017_experiments.sh 08 89012
+> sh run_isic2017_experiments.sh 09 90123
+```
+
+In early experiments, we test 10 seeds and selected the middle 5 when ranked in terms of performance,
+hence the specific seed choice.
+  
 
 ## Exploring the input data distribution present in semantic segmentation problems
 
