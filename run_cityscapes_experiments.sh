@@ -14,7 +14,7 @@ seed=${2}
 PARAMS_CITYSCAPES_DEEPLAB2I="--dataset=cityscapes --arch=resnet101_deeplab_imagenet --freeze_bn --batch_size=4 --learning_rate=3e-5 --iters_per_epoch=1000 --num_epochs=40"
 
 # Cityscapes augmentation settings
-AUG_CITYSCAPES="-crop_size=256,512 --aug_hflip"
+AUG_CITYSCAPES="--crop_size=256,512 --aug_hflip"
 
 # Cityscapes semi-supervised regularizers
 REG_SUPERVISED="--cons_weight=0.0"
