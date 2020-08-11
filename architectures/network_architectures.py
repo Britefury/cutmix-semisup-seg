@@ -9,7 +9,7 @@ try:
 except ImportError:
     deeplabv3_resnet101 = None
 
-from architectures import deeplab2, resunet, denseunet, deeplab3plus
+from architectures import deeplab2, resunet, denseunet, deeplab3plus, mit_csail_semseg
 
 
 class ArchRegistry(object):
@@ -104,6 +104,12 @@ def resnet101_deeplabv3plus_imagenet(num_classes=21, pretrained=True):
         raise NotImplementedError('DeepLab v3+ not available on this installation; requires PyTorch 1.1 and '
                                   'torchvision 0.3')
     return deeplab3plus.resnet101_deeplabv3plus_imagenet(num_classes=num_classes, pretrained=pretrained)
+
+
+@seg.register('resnet101_pspnet_imagenet')
+def resnet101_pspnet_imagenet(num_classes=21, pretrained=True):
+    model = mit_csail_semseg.MITSemSegNet(num_classes, 'resnet101dilated', 'ppm', pretraining='imagenet')
+    return model
 
 
 def robust_binary_crossentropy(pred, tgt, eps=1e-6):

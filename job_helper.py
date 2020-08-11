@@ -83,7 +83,6 @@ class SubmitConfig (object):
             sys.stderr = self.__stderr.stream
 
 
-# dnnlib not available; we're not running at nVidia Helsinki; run locally
 def job(job_name, enumerate_job_names=True):
     """
     Decorator to turn a function into a job submitter.
@@ -92,32 +91,23 @@ def job(job_name, enumerate_job_names=True):
 
     >>> @job('wait_some_time')
     ... def wait_some_time(submit_config: SubmitConfig, iteration_count):
-    ...     # Create a run context (hides low level details, exposes simple API to manage the run)
-    ...     with dnnlib.RunContext(submit_config) as ctx:
+    ...     fn = os.path.join(submit_config.run_dir, "output.txt")
+    ...     with open(fn, 'w') as f:
+    ...         f.write("Works!")
     ...
-    ...         fn = os.path.join(submit_config.run_dir, "output.txt")
-    ...         with open(fn, 'w') as f:
-    ...             f.write("Works!")
+    ...     print('Training...')
+    ...     for i in range(iteration_count):
+    ...         if ctx.should_stop():
+    ...             break
     ...
-    ...         print('Training...')
-    ...         for i in range(iteration_count):
-    ...             if ctx.should_stop():
-    ...                 break
-    ...
-    ...             time.sleep(1.0)
-    ...             ctx.update(loss='%2f' % i, cur_epoch=i, max_epoch=iteration_count)
+    ...         time.sleep(1.0)
 
     To submit a job:
     >>> wait_some_time.submit(on='local', job_desc='description_to_identify_specific_job', iteration_count=50)
 
     :param job_name: The name to be given to the job
-    :param module_name: If necessary, name the module in which the job function resides
-    :param docker_image: Provide the path to the docker image required for this job
-    :param num_gpus: The number of GPUs required
     :param enumerate_job_names: Enumerated job name prefix
     """
-
-    valid_targets = {'local', 'any', 'maxwell', 'pascal', 'volta', 'volta_or_pascal'}
 
     def decorate(job_fn):
         def run_job(**kwargs):

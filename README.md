@@ -20,6 +20,10 @@ Licensed under MIT license.
 - Jupyter notebook for the notebooks
 - numpy 1.18
 
+To use the PSPNet architecture (see [Pyramid Scene Parsing Network](https://arxiv.org/abs/1612.01105)
+by Zhao et al.), you will need to install the `logits-from_models` branch of
+[https://github.com/Britefury/semantic-segmentation-pytorch](https://github.com/Britefury/semantic-segmentation-pytorch).
+
 ## Datasets
 
 You need to:

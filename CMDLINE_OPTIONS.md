@@ -30,6 +30,12 @@ and models and predictions will be saved to the directory `results/train_seg_sem
         [torchvision ResNet-101 based DeepLab v3](https://pytorch.org/docs/stable/torchvision/models.html#semantic-segmentation)
         with ImageNet classification pre-training
     - `resnet101_deeplabv3plus_imagenet`: ResNet-101 based DeepLab v3+, with ImageNet classification pre-training
+    - `resnet101_pspnet_imagenet`: ResNet-101 based PSP-net
+        (see [Pyramid Scene Parsing Network](https://arxiv.org/abs/1612.01105) by Zhao et al.),
+        with ImageNet classification pre-training. To use this architecture you need to install our modified
+        version of MIT CSAIL's [semantic-segmentation-pytorch](https://github.com/CSAILVision/semantic-segmentation-pytorch)
+        library. Grab the `logits-from_models` branch of
+        [https://github.com/Britefury/semantic-segmentation-pytorch](https://github.com/Britefury/semantic-segmentation-pytorch)
 - `--freeze_bn`: flag to enable freezing of batch-norm layers. Use for DeepLab models, or for `resnet50unet_imagenet`
     if using a batch size of 1
 - `--opt_type` *[default=adam]*: optimizer type; one of `sgd`, `adam` *[default]*
