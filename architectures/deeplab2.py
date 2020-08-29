@@ -192,7 +192,16 @@ class ResNetDeepLab(nn.Module):
         x = self.layer4(x)
         x = self.layer5(x)
 
-        x = F.upsample(x, size=in_shape[2:4], mode='bilinear', align_corners=True)
+        # The implementation of this network came from the repo of
+        # Hung et al. at https://github.com/hfslyc/AdvSemiSeg, one of the works we compare against.
+        # They did their upsampling in their training script, where we do it in our network.
+        # They use `align_corners=True` when the PyTorch version is >= 0.4:
+        # https://github.com/hfslyc/AdvSemiSeg/blob/841d546c927605747594be726622363bf781cefb/train.py#L298
+        # We remain consistent with this.
+        # Torchvision has however decided to go with `align_corners=False`. Its probably more correct.
+        # Furthermore, their experiments showed that it makes little difference in terms of performance:
+        # https://github.com/pytorch/vision/issues/1708
+        x = F.interpolate(x, size=in_shape[2:4], mode='bilinear', align_corners=True)
 
         return x
 
