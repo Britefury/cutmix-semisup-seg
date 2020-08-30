@@ -8,6 +8,23 @@ Licensed under MIT license.
 
 ## Requirements
 
+We provide an `environment.yml` file that can be used to re-create a `conda` environment that provides the required
+packages:
+
+```
+conda env create -f environment.yml
+```
+
+Then activate with:
+
+```
+conda activate cutmix_semisup_seg
+```
+
+(**note**: this will not install the library needed to use the PSPNet architecture; see below)
+
+In general we need:
+
 - Python >= 3.6
 - PyTorch >= 1.4
 - torchvision 0.5
@@ -20,9 +37,15 @@ Licensed under MIT license.
 - Jupyter notebook for the notebooks
 - numpy 1.18
 
+#### Requirements for PSPNet
+
 To use the PSPNet architecture (see [Pyramid Scene Parsing Network](https://arxiv.org/abs/1612.01105)
 by Zhao et al.), you will need to install the `logits-from_models` branch of
-[https://github.com/Britefury/semantic-segmentation-pytorch](https://github.com/Britefury/semantic-segmentation-pytorch).
+[https://github.com/Britefury/semantic-segmentation-pytorch](https://github.com/Britefury/semantic-segmentation-pytorch):
+
+```
+pip install git+https://github.com/Britefury/semantic-segmentation-pytorch.git@logits-from-models
+```
 
 ## Datasets
 
