@@ -296,6 +296,18 @@ def train_seg_semisup_mask_mt(submit_config: job_helper.SubmitConfig, dataset, m
                         batch_um1 = unsup_batch1['mask'].to(torch_device)
                         batch_mask_params = unsup_batch0['mask_params'].to(torch_device)
 
+                        # batch_um0 and batch_um1 are masks that are 1 for valid pixels, 0 for invalid pixels.
+                        # They are used later on to scale the consistency loss, so that consistency loss is
+                        # only computed for valid pixels.
+                        # Explanation:
+                        # When using geometric augmentations such as rotations, some pixels in the training
+                        # crop may come from outside the bounds of the input image. These pixels will have a value
+                        # of 0 in these masks. Similarly, when using scaled crops, the size of the crop
+                        # from the input image that must be scaled to the size of the training crop may be
+                        # larger than one/both of the input image dimensions. Pixels in the training crop
+                        # that arise from outside the input image bounds will once again be given a value
+                        # of 0 in these masks.
+
                         # Convert mask parameters to masks of shape (N,1,H,W)
                         batch_mix_masks = mask_generator.torch_masks_from_params(
                             batch_mask_params, batch_ux0.shape[2:4], torch_device)

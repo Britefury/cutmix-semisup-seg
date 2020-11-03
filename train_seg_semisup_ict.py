@@ -256,6 +256,18 @@ def train_seg_semisup_ict(submit_config: job_helper.SubmitConfig, dataset, model
                     batch_ux1 = unsup_batch1['image'].to(torch_device)
                     batch_um1 = unsup_batch1['mask'].to(torch_device)
 
+                    # batch_um0 and batch_um1 are masks that are 1 for valid pixels, 0 for invalid pixels.
+                    # They are used later on to scale the consistency loss, so that consistency loss is
+                    # only computed for valid pixels.
+                    # Explanation:
+                    # When using geometric augmentations such as rotations, some pixels in the training
+                    # crop may come from outside the bounds of the input image. These pixels will have a value
+                    # of 0 in these masks. Similarly, when using scaled crops, the size of the crop
+                    # from the input image that must be scaled to the size of the training crop may be
+                    # larger than one/both of the input image dimensions. Pixels in the training crop
+                    # that arise from outside the input image bounds will once again be given a value
+                    # of 0 in these masks.
+
                     # ICT mix factors
                     ict_mix_factors = np.random.beta(ict_alpha, ict_alpha, size=(len(batch_ux0), 1, 1, 1))
                     ict_mix_factors = torch.tensor(ict_mix_factors, dtype=torch.float, device=torch_device)

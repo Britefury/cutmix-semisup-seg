@@ -261,6 +261,18 @@ def train_seg_semisup_aug_mt(submit_config: job_helper.SubmitConfig, dataset, mo
                     batch_um1 = unsup_batch['sample1']['mask'].to(torch_device)
                     batch_ufx0_to_1 = unsup_batch['xf0_to_1'].to(torch_device)
 
+                    # batch_um0 and batch_um1 are masks that are 1 for valid pixels, 0 for invalid pixels.
+                    # They are used later on to scale the consistency loss, so that consistency loss is
+                    # only computed for valid pixels.
+                    # Explanation:
+                    # When using geometric augmentations such as rotations, some pixels in the training
+                    # crop may come from outside the bounds of the input image. These pixels will have a value
+                    # of 0 in these masks. Similarly, when using scaled crops, the size of the crop
+                    # from the input image that must be scaled to the size of the training crop may be
+                    # larger than one/both of the input image dimensions. Pixels in the training crop
+                    # that arise from outside the input image bounds will once again be given a value
+                    # of 0 in these masks.
+
                     # Get teacher predictions for image0
                     with torch.no_grad():
                         logits_cons_tea = teacher_net(batch_ux0).detach()
