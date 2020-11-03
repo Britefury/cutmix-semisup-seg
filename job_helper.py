@@ -66,7 +66,7 @@ class SubmitConfig (object):
 
     @property
     def run_dir(self):
-        if self.__run_dir is None:
+        if self.__run_dir is None and self.job_out_dir is not None:
             # Make the run dir to receive output
             self.__run_dir = self.job_out_dir
             os.makedirs(self.__run_dir, exist_ok=True)

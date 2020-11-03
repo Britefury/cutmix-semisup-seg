@@ -146,3 +146,15 @@ in the notebook `Plot inter-class and intra-class distances from files.ipynb`
 Note that running the second notebook requires that you generate some data files using the
 `intra_inter_class_patch_dist.py` program.
 
+
+## Toy 2D experiments
+
+The toy 2D experiments used to produce Figure 3 in the paper can be run using the `toy2d_train.py`
+program, which is documented [here](./TOY2D.md).
+
+You can re-create the toy 2D experiments by running the `run_toy2d_experiments.sh` shell script:
+
+```
+> sh run_toy2d_experiments.sh <run>
+```
+

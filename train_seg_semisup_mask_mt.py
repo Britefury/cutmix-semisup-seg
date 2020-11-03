@@ -1,4 +1,3 @@
-# Import the Torch CuDNN backend, otherwise Tensorflow will import an incompatible one and break things
 import job_helper
 import click
 
