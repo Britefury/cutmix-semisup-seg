@@ -7,6 +7,8 @@ def train_seg_semisup_ict(submit_config: job_helper.SubmitConfig, dataset, model
                           learning_rate, lr_sched, lr_step_epochs, lr_step_gamma, lr_poly_power,
                           teacher_alpha, bin_fill_holes,
                           crop_size, aug_hflip, aug_vflip, aug_hvflip, aug_scale_hung, aug_max_scale, aug_scale_non_uniform, aug_rot_mag,
+                          aug_strong_colour, aug_colour_brightness, aug_colour_contrast, aug_colour_saturation, aug_colour_hue,
+                          aug_colour_prob, aug_colour_greyscale_prob,
                           ict_alpha, cons_loss_fn, cons_weight, conf_thresh, conf_per_pixel, rampup, unsup_batch_ratio,
                           num_epochs, iters_per_epoch, batch_size,
                           n_sup, n_unsup, n_val, split_seed, split_path, val_seed, save_preds, save_model, num_workers):
@@ -21,6 +23,7 @@ def train_seg_semisup_ict(submit_config: job_helper.SubmitConfig, dataset, model
     import torch.nn as nn, torch.nn.functional as F
     from architectures import network_architectures
     import torch.utils.data
+    import torchvision.transforms as tvt
     from datapipe import datasets
     from datapipe import seg_data, seg_transforms, seg_transforms_cv
     import evaluation
@@ -134,14 +137,31 @@ def train_seg_semisup_ict(submit_config: job_helper.SubmitConfig, dataset, model
     if aug_hflip or aug_vflip or aug_hvflip:
         train_transforms.append(
             seg_transforms_cv.SegCVTransformRandomFlip(aug_hflip, aug_vflip, aug_hvflip))
+
+    # Duplicate transforms so far for unsupervised path
+    train_unsup_transforms = train_transforms.copy()
+    # Flag indicating if the unsupervised batches are expected to be paired
+    unsup_paired = False
+    if aug_strong_colour:
+        colour_xforms = tvt.Compose([
+            tvt.RandomApply([
+                tvt.ColorJitter(aug_colour_brightness, aug_colour_contrast, aug_colour_saturation, aug_colour_hue)  # not strengthened
+            ], p=aug_colour_prob),
+            tvt.RandomGrayscale(p=aug_colour_greyscale_prob),
+        ])
+        train_unsup_transforms.append(seg_transforms.SegTransformToPair())
+        train_unsup_transforms.append(seg_transforms_cv.SegCVTransformTVT(colour_xforms))
+        unsup_paired = True
+
     train_transforms.append(seg_transforms_cv.SegCVTransformNormalizeToTensor(NET_MEAN, NET_STD))
+    train_unsup_transforms.append(seg_transforms_cv.SegCVTransformNormalizeToTensor(NET_MEAN, NET_STD))
 
     # Train data pipeline: supervised and unsupervised data sets
-    train_sup_ds = ds_src.dataset(labels=True, mask=False, xf=False, pair=False,
+    train_sup_ds = ds_src.dataset(labels=True, mask=False, xf=False,
                                   transforms=seg_transforms.SegTransformCompose(train_transforms),
                                   pipeline_type='cv')
-    train_unsup_ds = ds_src.dataset(labels=False, mask=True, xf=False, pair=False,
-                                    transforms=seg_transforms.SegTransformCompose(train_transforms),
+    train_unsup_ds = ds_src.dataset(labels=False, mask=True, xf=False,
+                                    transforms=seg_transforms.SegTransformCompose(train_unsup_transforms),
                                     pipeline_type='cv')
 
     collate_fn = seg_data.SegCollate(BLOCK_SIZE)
@@ -251,10 +271,24 @@ def train_seg_semisup_ict(submit_config: job_helper.SubmitConfig, dataset, model
                     # Mix mode: batch consists of paired unsupervised samples
                     unsup_batch0 = next(train_unsup_iter)
                     unsup_batch1 = next(train_unsup_iter)
-                    batch_ux0 = unsup_batch0['image'].to(torch_device)
-                    batch_um0 = unsup_batch0['mask'].to(torch_device)
-                    batch_ux1 = unsup_batch1['image'].to(torch_device)
-                    batch_um1 = unsup_batch1['mask'].to(torch_device)
+                    if unsup_paired:
+                        # The teacher path should come from sample 0 that has weaker
+                        # augmentation (no colour augmentation), where the student should
+                        # use sample 1 that has stronger augmentation
+
+                        batch_ux0_tea = unsup_batch0['sample0']['image'].to(torch_device)
+                        batch_ux0_stu = unsup_batch0['sample1']['image'].to(torch_device)
+                        batch_um0 = unsup_batch0['sample0']['mask'].to(torch_device)
+                        batch_ux1_tea = unsup_batch1['sample0']['image'].to(torch_device)
+                        batch_ux1_stu = unsup_batch1['sample1']['image'].to(torch_device)
+                        batch_um1 = unsup_batch1['sample0']['mask'].to(torch_device)
+                    else:
+                        batch_ux0_tea = unsup_batch0['image'].to(torch_device)
+                        batch_ux0_stu = batch_ux0_tea
+                        batch_um0 = unsup_batch0['mask'].to(torch_device)
+                        batch_ux1_tea = unsup_batch1['image'].to(torch_device)
+                        batch_ux1_stu = batch_ux1_tea
+                        batch_um1 = unsup_batch1['mask'].to(torch_device)
 
                     # batch_um0 and batch_um1 are masks that are 1 for valid pixels, 0 for invalid pixels.
                     # They are used later on to scale the consistency loss, so that consistency loss is
@@ -269,19 +303,19 @@ def train_seg_semisup_ict(submit_config: job_helper.SubmitConfig, dataset, model
                     # of 0 in these masks.
 
                     # ICT mix factors
-                    ict_mix_factors = np.random.beta(ict_alpha, ict_alpha, size=(len(batch_ux0), 1, 1, 1))
+                    ict_mix_factors = np.random.beta(ict_alpha, ict_alpha, size=(len(batch_ux0_tea), 1, 1, 1))
                     ict_mix_factors = torch.tensor(ict_mix_factors, dtype=torch.float, device=torch_device)
 
                     # Mix images
-                    batch_ux_mixed = batch_ux0 * (1.0 - ict_mix_factors) + batch_ux1 * ict_mix_factors
+                    batch_ux_stu_mixed = batch_ux0_stu * (1.0 - ict_mix_factors) + batch_ux1_stu * ict_mix_factors
                     batch_um_mixed = batch_um0 * (1.0 - ict_mix_factors) + batch_um1 * ict_mix_factors
 
                     # Get teacher predictions for original images
                     with torch.no_grad():
-                        logits_u0_tea = teacher_net(batch_ux0).detach()
-                        logits_u1_tea = teacher_net(batch_ux1).detach()
+                        logits_u0_tea = teacher_net(batch_ux0_tea).detach()
+                        logits_u1_tea = teacher_net(batch_ux1_tea).detach()
                     # Get student prediction for mixed image
-                    logits_cons_stu = student_net(batch_ux_mixed)
+                    logits_cons_stu = student_net(batch_ux_stu_mixed)
 
                     # Logits -> probs
                     prob_u0_tea = F.softmax(logits_u0_tea, dim=1)
@@ -492,6 +526,13 @@ def train_seg_semisup_ict(submit_config: job_helper.SubmitConfig, dataset, model
 @click.option('--aug_max_scale', type=float, default=1.0)
 @click.option('--aug_scale_non_uniform', is_flag=True, default=False)
 @click.option('--aug_rot_mag', type=float, default=0.0)
+@click.option('--aug_strong_colour', is_flag=True, default=False)
+@click.option('--aug_colour_brightness', type=float, default=0.4)
+@click.option('--aug_colour_contrast', type=float, default=0.4)
+@click.option('--aug_colour_saturation', type=float, default=0.4)
+@click.option('--aug_colour_hue', type=float, default=0.1)
+@click.option('--aug_colour_prob', type=float, default=0.8)
+@click.option('--aug_colour_greyscale_prob', type=float, default=0.2)
 @click.option('--ict_alpha', type=float, default=0.1)
 @click.option('--cons_loss_fn', type=click.Choice(['var', 'bce', 'kld', 'logits_var', 'logits_smoothl1']), default='var')
 @click.option('--cons_weight', type=float, default=0.3)
@@ -516,6 +557,8 @@ def experiment(job_desc, dataset, model, arch, freeze_bn,
                learning_rate, lr_sched, lr_step_epochs, lr_step_gamma, lr_poly_power,
                teacher_alpha, bin_fill_holes,
                crop_size, aug_hflip, aug_vflip, aug_hvflip, aug_scale_hung, aug_max_scale, aug_scale_non_uniform, aug_rot_mag,
+               aug_strong_colour, aug_colour_brightness, aug_colour_contrast, aug_colour_saturation, aug_colour_hue,
+               aug_colour_prob, aug_colour_greyscale_prob,
                ict_alpha, cons_loss_fn, cons_weight, conf_thresh, conf_per_pixel, rampup, unsup_batch_ratio,
                num_epochs, iters_per_epoch, batch_size,
                n_sup, n_unsup, n_val, split_seed, split_path, val_seed, save_preds, save_model, num_workers):

@@ -68,8 +68,8 @@ class CamVidDataSource (seg_data.ZipDataSource):
         self.num_classes = len(self.class_names) - 1
 
 
-    def dataset(self, labels, mask, xf, pair, transforms=None, pipeline_type='cv', include_indices=False):
-        return CamVidAccessor(self, labels, mask, xf, pair, transforms=transforms, pipeline_type=pipeline_type,
+    def dataset(self, labels, mask, xf, transforms=None, pipeline_type='cv', include_indices=False):
+        return CamVidAccessor(self, labels, mask, xf, transforms=transforms, pipeline_type=pipeline_type,
                               include_indices=include_indices)
 
 

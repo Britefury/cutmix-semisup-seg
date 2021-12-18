@@ -302,7 +302,7 @@ def test_SegImageNormalizeToTensor():
     img_transform = datapipe.seg_transforms_cv.SegCVTransformNormalizeToTensor(None, None)
 
     # Apply to single image
-    seg_tens0 = img_transform.transform(seg_img0)
+    seg_tens0 = img_transform.transform_single(seg_img0)
     assert (seg_tens0.image == img_as_float(seg_img0.image).transpose(2, 0, 1).astype(np.float32)).all()
     assert (seg_tens0.labels == seg_img0.labels[None, ...]).all()
     assert (seg_tens0.mask == img_as_float(seg_img0.mask)[None, ...].astype(np.float32)).all()
@@ -332,14 +332,14 @@ def test_SegImageRandomCrop():
 
     # Apply to single image
     rng.uniform.side_effect = [np.array([0.5, 0.5])]
-    crop0 = img_transform.transform(seg_img0)
+    crop0 = img_transform.transform_single(seg_img0)
     assert (crop0.image == seg_img0.image[64:192, 64:192, :]).all()
     assert (crop0.labels == seg_img0.labels[64:192, 64:192]).all()
     assert (crop0.mask == seg_img0.mask[64:192, 64:192]).all()
     assert (crop0.xf == affine.translation_matrices(np.array([[-64, -64]]))).all()
 
     rng.uniform.side_effect = [np.array([0.25, 0.75])]
-    crop0 = img_transform.transform(seg_img0)
+    crop0 = img_transform.transform_single(seg_img0)
     assert (crop0.image == seg_img0.image[32:160, 96:224, :]).all()
     assert (crop0.labels == seg_img0.labels[32:160, 96:224]).all()
     assert (crop0.mask == seg_img0.mask[32:160, 96:224]).all()
@@ -380,7 +380,7 @@ def test_SegImageRandomCropScaleHung():
     # Apply to single image
     rng.randint.side_effect = [3]   # 3 / 10 + 0.5 = scale factor of 0.8; crop of 160x160 scaled to 128x128
     rng.uniform.side_effect = [np.array([0.5, 0.5])]
-    crop0 = img_transform.transform(seg_img0)
+    crop0 = img_transform.transform_single(seg_img0)
     assert (crop0.image == cv2.resize(seg_img0.image[48:208, 48:208, :], (128, 128), interpolation=cv2.INTER_LINEAR)).all()
     assert (crop0.labels == cv2.resize(seg_img0.labels[48:208, 48:208], (128, 128), interpolation=cv2.INTER_NEAREST)).all()
     assert (crop0.mask == cv2.resize(seg_img0.mask[48:208, 48:208], (128, 128), interpolation=cv2.INTER_LINEAR)).all()
@@ -389,7 +389,7 @@ def test_SegImageRandomCropScaleHung():
 
     rng.randint.side_effect = [7]   # 7 / 10 + 0.5 = scale factor of 1.2; crop of 107x107 scaled to 128x128
     rng.uniform.side_effect = [np.array([0.25, 0.75])]
-    crop0 = img_transform.transform(seg_img0)
+    crop0 = img_transform.transform_single(seg_img0)
     assert (crop0.image == cv2.resize(seg_img0.image[37:144, 112:219, :], (128, 128), interpolation=cv2.INTER_LINEAR)).all()
     assert (crop0.labels == cv2.resize(seg_img0.labels[37:144, 112:219], (128, 128), interpolation=cv2.INTER_NEAREST)).all()
     assert (crop0.mask == cv2.resize(seg_img0.mask[37:144, 112:219], (128, 128), interpolation=cv2.INTER_LINEAR)).all()
@@ -432,21 +432,21 @@ def test_SegImageRandomFlip():
 
     # Apply to single image
     rng.binomial.side_effect = [np.array([1, 0, 0]), np.array([0, 1, 0]), np.array([0, 0, 1])]
-    hflipped = img_transform.transform(seg_img0)
+    hflipped = img_transform.transform_single(seg_img0)
     assert (hflipped.image == seg_img0.image[:, ::-1, :]).all()
     assert (hflipped.labels == seg_img0.labels[:, ::-1]).all()
     assert (hflipped.mask == seg_img0.mask[:, ::-1]).all()
     assert (hflipped.xf == np.array([[[-1, 0, 255.0],
                                       [0,  1, 0]]])).all()
 
-    vflipped = img_transform.transform(seg_img0)
+    vflipped = img_transform.transform_single(seg_img0)
     assert (vflipped.image == seg_img0.image[::-1, :, :]).all()
     assert (vflipped.labels == seg_img0.labels[::-1, :]).all()
     assert (vflipped.mask == seg_img0.mask[::-1, :]).all()
     assert (vflipped.xf == np.array([[[1, 0, 0],
                                       [0, -1, 255.0]]])).all()
 
-    hvflipped = img_transform.transform(seg_img0)
+    hvflipped = img_transform.transform_single(seg_img0)
     assert (hvflipped.image == seg_img0.image.transpose(1, 0, 2)).all()
     assert (hvflipped.labels == seg_img0.labels.T).all()
     assert (hvflipped.mask == seg_img0.mask.T).all()

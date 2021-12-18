@@ -80,8 +80,8 @@ class ISIC2017DataSource (seg_data.ZipDataSource):
         self.rgb_std = mean_std['rgb_std']
 
 
-    def dataset(self, labels, mask, xf, pair, transforms=None, pipeline_type='cv', include_indices=False):
-        return ISIC2017Accessor(self, labels, mask, xf, pair, transforms=transforms, pipeline_type=pipeline_type,
+    def dataset(self, labels, mask, xf, transforms=None, pipeline_type='cv', include_indices=False):
+        return ISIC2017Accessor(self, labels, mask, xf, transforms=transforms, pipeline_type=pipeline_type,
                                 include_indices=include_indices)
 
 

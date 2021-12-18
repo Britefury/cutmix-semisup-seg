@@ -151,8 +151,8 @@ class PascalVOCDataSource (seg_data.DataSource):
         return np.array(img)
 
 
-    def dataset(self, labels, mask, xf, pair, transforms=None, pipeline_type='cv', include_indices=False):
-        return PascalVOCAccessor(self, labels, mask, xf, pair, transforms=transforms, pipeline_type=pipeline_type,
+    def dataset(self, labels, mask, xf, transforms=None, pipeline_type='cv', include_indices=False):
+        return PascalVOCAccessor(self, labels, mask, xf, transforms=transforms, pipeline_type=pipeline_type,
                                  include_indices=include_indices)
 
     def get_mean_std(self):

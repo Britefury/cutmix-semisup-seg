@@ -15,7 +15,7 @@ seed=${2}
 PARAMS_ISIC2017_DENSEUNET_IMAGENET="--dataset=isic2017 --arch=densenet161unet_imagenet --batch_size=10 --iters_per_epoch=400 --num_epochs=100 --opt_type=sgd --learning_rate=0.1 --sgd_weight_decay=5e-4 --lr_sched=poly --bin_fill_holes"
 
 # ISIC 2017 augmentation settings: 224x224 crop, h/v/hv flip, scale [0.9,1.1], rotate [-45,45]
-AUG_ISIC2017_SCLROT="--crop_size=224,224 --aug_hflip --aug_vflip --aug_hvflip --aug_max_scale=1.1 --aug_rot_mag=45.0"
+AUG_ISIC2017_SCLROT="--crop_size=224,224 --aug_hflip --aug_vflip --aug_hvflip --aug_max_scale=1.1 --aug_rot_mag=45.0 --aug_strong_colour"
 
 # ISIC 2017 semi-supervised regularizers
 REG_SUPERVISED="--cons_weight=0.0"

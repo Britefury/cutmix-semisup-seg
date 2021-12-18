@@ -1,9 +1,20 @@
-# Semi-supervised semantic segmentation needs strong, varied perturbations
-#### by Geoff French, Samuli Laine, Timo Aila, Michal Mackiewicz, Graham Finlayson
-Implementation of our [paper](https://arxiv.org/abs/1906.01916).
+# Semi-supervised semantic segmentation using CutMix and Colour Augmentation
 
+Implementations of our papers:
+
+- [Semi-supervised semantic segmentation needs strong, varied perturbations](https://arxiv.org/abs/1906.01916) by
+  Geoff French, Samuli Laine, Timo Aila, Michal Mackiewicz and Graham Finlayson
+- [Colour augmentation for improved semi-supervised semantic segmentation](https://arxiv.org/abs/2110.04487) by
+  Geoff French and Michal Mackiewicz
+  
 
 Licensed under MIT license.
+
+
+## Colour augmentation
+
+Please see our new [paper](https://arxiv.org/abs/2110.04487) for a full discussion, but a summary of our findings can
+be found in our [colour augmentation](Colour augmentation.ipynb) Jupyter notebook.
 
 
 ## Requirements

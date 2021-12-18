@@ -8,6 +8,8 @@ def train_seg_semisup_aug_mt(submit_config: job_helper.SubmitConfig, dataset, mo
                              teacher_alpha, bin_fill_holes,
                              crop_size, aug_offset_range, aug_hflip, aug_vflip, aug_hvflip,
                              aug_scale_hung, aug_max_scale, aug_scale_non_uniform, aug_rot_mag, aug_free_scale_rot,
+                             aug_strong_colour, aug_colour_brightness, aug_colour_contrast, aug_colour_saturation, aug_colour_hue,
+                             aug_colour_prob, aug_colour_greyscale_prob,
                              cons_loss_fn, cons_weight, conf_thresh, conf_per_pixel, rampup, unsup_batch_ratio,
                              num_epochs, iters_per_epoch, batch_size,
                              n_sup, n_unsup, n_val, split_seed, split_path, val_seed, save_preds, save_model, num_workers):
@@ -22,6 +24,7 @@ def train_seg_semisup_aug_mt(submit_config: job_helper.SubmitConfig, dataset, mo
     import torch.nn as nn, torch.nn.functional as F
     from architectures import network_architectures
     import torch.utils.data
+    from torchvision import transforms as tvt
     from datapipe import datasets
     from datapipe import seg_data, seg_transforms, seg_transforms_cv
     import evaluation
@@ -139,14 +142,30 @@ def train_seg_semisup_aug_mt(submit_config: job_helper.SubmitConfig, dataset, mo
     if aug_hflip or aug_vflip or aug_hvflip:
         train_transforms.append(
             seg_transforms_cv.SegCVTransformRandomFlip(aug_hflip, aug_vflip, aug_hvflip))
+
+    # The unsupervised path should split the sample into a pair first, then apply the
+    # augmentations created for the supervised training path above.
+    # This way different augmentation parameters will be used for each element of the pair,
+    # allowing us to compute consistency loss.
+    train_unsup_transforms = [seg_transforms.SegTransformToPair()] + train_transforms
+    if aug_strong_colour:
+        colour_xforms = tvt.Compose([
+            tvt.RandomApply([
+                tvt.ColorJitter(aug_colour_brightness, aug_colour_contrast, aug_colour_saturation, aug_colour_hue)  # not strengthened
+            ], p=aug_colour_prob),
+            tvt.RandomGrayscale(p=aug_colour_greyscale_prob),
+        ])
+        train_unsup_transforms.append(seg_transforms_cv.SegCVTransformTVT(colour_xforms))
+
     train_transforms.append(seg_transforms_cv.SegCVTransformNormalizeToTensor(NET_MEAN, NET_STD))
+    train_unsup_transforms.append(seg_transforms_cv.SegCVTransformNormalizeToTensor(NET_MEAN, NET_STD))
 
     # Train data pipeline: supervised and unsupervised data sets
-    train_sup_ds = ds_src.dataset(labels=True, mask=False, xf=False, pair=False,
+    train_sup_ds = ds_src.dataset(labels=True, mask=False, xf=False,
                                   transforms=seg_transforms.SegTransformCompose(train_transforms),
                                   pipeline_type='cv')
-    train_unsup_ds = ds_src.dataset(labels=False, mask=True, xf=True, pair=True,
-                                    transforms=seg_transforms.SegTransformCompose(train_transforms),
+    train_unsup_ds = ds_src.dataset(labels=False, mask=True, xf=True,
+                                    transforms=seg_transforms.SegTransformCompose(train_unsup_transforms),
                                     pipeline_type='cv')
 
     collate_fn = seg_data.SegCollate(BLOCK_SIZE)
@@ -516,6 +535,13 @@ def train_seg_semisup_aug_mt(submit_config: job_helper.SubmitConfig, dataset, mo
 @click.option('--aug_scale_non_uniform', is_flag=True, default=False)
 @click.option('--aug_rot_mag', type=float, default=0.0)
 @click.option('--aug_free_scale_rot', is_flag=True, default=False)
+@click.option('--aug_strong_colour', is_flag=True, default=False)
+@click.option('--aug_colour_brightness', type=float, default=0.4)
+@click.option('--aug_colour_contrast', type=float, default=0.4)
+@click.option('--aug_colour_saturation', type=float, default=0.4)
+@click.option('--aug_colour_hue', type=float, default=0.1)
+@click.option('--aug_colour_prob', type=float, default=0.8)
+@click.option('--aug_colour_greyscale_prob', type=float, default=0.2)
 @click.option('--cons_loss_fn', type=click.Choice(['var', 'bce', 'kld', 'logits_var', 'logits_smoothl1']), default='var')
 @click.option('--cons_weight', type=float, default=1.0)
 @click.option('--conf_thresh', type=float, default=0.97)
@@ -540,6 +566,8 @@ def experiment(job_desc, dataset, model, arch, freeze_bn,
                teacher_alpha, bin_fill_holes,
                crop_size, aug_offset_range, aug_hflip, aug_vflip, aug_hvflip,
                aug_scale_hung, aug_max_scale, aug_scale_non_uniform, aug_rot_mag, aug_free_scale_rot,
+               aug_strong_colour, aug_colour_brightness, aug_colour_contrast, aug_colour_saturation, aug_colour_hue,
+               aug_colour_prob, aug_colour_greyscale_prob,
                cons_loss_fn, cons_weight, conf_thresh, conf_per_pixel, rampup, unsup_batch_ratio,
                num_epochs, iters_per_epoch, batch_size,
                n_sup, n_unsup, n_val, split_seed, split_path, val_seed, save_preds, save_model, num_workers):

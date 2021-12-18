@@ -15,6 +15,7 @@ import math
 import cv2
 import numpy as np
 from skimage import img_as_float
+from PIL import Image
 
 from datapipe import affine
 from datapipe.seg_transforms import SegTransform
@@ -304,7 +305,7 @@ class SegCVTransformRandomCropScaleHung (SegCVTransformPad):
 
 class SegCVTransformRandomCropRotateScale (SegCVTransformPad):
     """
-    Random crop with random scale.
+    Random crop with random scale and rotate.
     """
     def __init__(self, crop_size, crop_offset, rot_mag, max_scale, uniform_scale=True, constrain_rot_scale=True,
                  rng=None):
@@ -533,6 +534,52 @@ class SegCVTransformRandomFlip (SegTransform):
             )
             sample0['xf_cv'] = xf01[0]
             sample1['xf_cv'] = xf01[1]
+
+        return (sample0, sample1)
+
+
+class SegCVTransformTVT (SegTransform):
+    """Apply a torchvision transform
+
+    tvt_xform - the torchvision transform to apply
+    apply_single - apply to single samples
+    apply_pair0 - when transforming a pair of samples, apply to sample0
+    apply_pair1 - when transforming a pair of samples, apply to sample1
+    """
+    def __init__(self, transform, apply_single=False, apply_pair0=False, apply_pair1=True):
+        self.tvt_xform = transform
+        self.apply_single = apply_single
+        self.apply_pair0 = apply_pair0
+        self.apply_pair1 = apply_pair1
+
+    def _apply_to_image_array(self, img_arr):
+        if img_arr.shape[2] == 4:
+            alpha_channel = img_arr[:, :, 3:4]
+        else:
+            alpha_channel = None
+        img_pil = Image.fromarray(img_arr[:, :, :3])
+        img_pil = self.tvt_xform(img_pil)
+        img_arr_rgb = np.array(img_pil)
+        if alpha_channel is not None:
+            return np.append(img_arr_rgb, alpha_channel, axis=2)
+        else:
+            return img_arr_rgb
+
+    def transform_single(self, sample):
+        if self.apply_single:
+            sample = sample.copy()
+            sample['image_arr'] = self._apply_to_image_array(sample['image_arr'])
+
+        return sample
+
+    def transform_pair(self, sample0, sample1):
+        if self.apply_pair0:
+            sample0 = sample0.copy()
+            sample0['image_arr'] = self._apply_to_image_array(sample0['image_arr'])
+
+        if self.apply_pair1:
+            sample1 = sample1.copy()
+            sample1['image_arr'] = self._apply_to_image_array(sample1['image_arr'])
 
         return (sample0, sample1)
 

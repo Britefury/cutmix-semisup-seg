@@ -13,7 +13,7 @@ from datapipe import affine
 
 
 class SegAccessor (Dataset):
-    def __init__(self, ds, labels, mask, xf, pair, transforms, pipeline_type='cv', include_indices=False):
+    def __init__(self, ds, labels, mask, xf, transforms, pipeline_type='cv', include_indices=False):
         """
         Generates samples.
 
@@ -36,8 +36,6 @@ class SegAccessor (Dataset):
         :param labels: flag indicating if the ground truth labels should be loaded
         :param mask: flag indicating if mask should be loaded
         :param xf: flag indicating if transformation should be loaded
-        :param pair: flag indicating if sample should be 'paired' for standard augmentation driven consistency
-            regularization.  If True, each sample will be a dict of `{'sample0': <sample>
         :param transforms: optional transformation to apply to each sample when retrieved
         :param pipeline_type: pipeline type 'pil' | 'cv'
         :param include_indices: if True, include sample index in each sample
@@ -51,7 +49,6 @@ class SegAccessor (Dataset):
         self.labels_flag = labels
         self.mask_flag = mask
         self.xf_flag = xf
-        self.pair_flag = pair
         self.transforms = transforms
         self.pipeline_type = pipeline_type
         self.include_indices = include_indices
@@ -66,56 +63,50 @@ class SegAccessor (Dataset):
         raise NotImplementedError('Abstract')
 
     def __getitem__(self, sample_i):
-        sample0 = {}
+        sample = {}
 
         image = self.get_image_pil(sample_i)
         size_xy = image.size
-        sample0['image_size_yx'] = np.array(size_xy[::-1])
+        sample['image_size_yx'] = np.array(size_xy[::-1])
         if self.pipeline_type == 'pil':
-            sample0['image_pil'] = image
+            sample['image_pil'] = image
         elif self.pipeline_type == 'cv':
-            sample0['image_arr'] = np.array(image)
+            sample['image_arr'] = np.array(image)
         else:
             raise RuntimeError
 
         if self.labels_flag:
             labels = self.get_labels_arr(sample_i)
             if self.pipeline_type == 'pil':
-                sample0['labels_pil'] = Image.fromarray(labels)
+                sample['labels_pil'] = Image.fromarray(labels)
             elif self.pipeline_type == 'cv':
-                sample0['labels_arr'] = labels.astype(np.int32)
+                sample['labels_arr'] = labels.astype(np.int32)
             else:
                 raise RuntimeError
 
         if self.mask_flag:
             if self.pipeline_type == 'pil':
-                sample0['mask_pil'] = Image.new('L', size_xy, 255)
+                sample['mask_pil'] = Image.new('L', size_xy, 255)
             elif self.pipeline_type == 'cv':
-                sample0['mask_arr'] = np.full(size_xy[::-1], 255, dtype=np.uint8)
+                sample['mask_arr'] = np.full(size_xy[::-1], 255, dtype=np.uint8)
             else:
                 raise RuntimeError
 
         if self.xf_flag:
             xf = affine.identity_xf(1)[0]
             if self.pipeline_type == 'pil':
-                sample0['xf_pil'] = xf
+                sample['xf_pil'] = xf
             elif self.pipeline_type == 'cv':
-                sample0['xf_cv'] = xf
+                sample['xf_cv'] = xf
             else:
                 raise RuntimeError
 
         if self.include_indices:
-            sample0['index'] = int(sample_i)
+            sample['index'] = int(sample_i)
 
-        if self.pair_flag:
-            sample1 = sample0.copy()
-            if self.transforms is not None:
-                sample0, sample1 = self.transforms.transform_pair(sample0, sample1)
-            return dict(sample0=sample0, sample1=sample1)
-        else:
-            if self.transforms is not None:
-                sample0 = self.transforms.transform_single(sample0)
-            return sample0
+        if self.transforms is not None:
+            sample = self.transforms.apply(sample)
+        return sample
 
 
 def save_prediction(out_dir, pred_y_arr, sample_name):

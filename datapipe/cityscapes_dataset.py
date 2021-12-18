@@ -130,8 +130,8 @@ class CityscapesDataSource (seg_data.ZipDataSource):
         self.num_classes = len(self.class_names)
 
 
-    def dataset(self, labels, mask, xf, pair, transforms=None, pipeline_type='cv', include_indices=False):
-        return CityscapesAccessor(self, labels, mask, xf, pair, transforms=transforms, pipeline_type=pipeline_type,
+    def dataset(self, labels, mask, xf, transforms=None, pipeline_type='cv', include_indices=False):
+        return CityscapesAccessor(self, labels, mask, xf, transforms=transforms, pipeline_type=pipeline_type,
                                   include_indices=include_indices)
 
 
