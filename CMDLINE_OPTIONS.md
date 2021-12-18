@@ -6,11 +6,20 @@
 These options apply to all experiments. For options for specific experiments (mask based consistency,
 augmentation based consistency, ICT, VAT), see below.
 
+###### Output and dataset options
 - `--job_desc`: provide a job description/name. For example, running the `train_seg_semisup_mask_mt.py`
 with `--job_desc=test_a_1` program will save its log file to `results/train_seg_semisup_mask_mt/log_test_a_1.txt`
 and models and predictions will be saved to the directory `results/train_seg_semisup_mask_mt/test_a_1`.
 - `--dataset` *[default=pascal_aug]*: select the dataset to train on:, one
     of `camvid`,`cityscapes`,`pascal`,`pascal_aug`  (Pascal VOC 2012 augmented with SBD),`isic2017`
+- `--bin_fill_holes`: flag to enable hole filling for foreground class. Only usable for binary segmentation
+    tasks e.g. ISIC 2017 segmentation. Used for ISIC 2017 experiments.
+- `--save_preds`: if enabled, after training the predictions for validation and test samples will be
+    saved in the output directory (see `--job_desc`)
+- `--save_model`: if enabled, after training the model will be saved in the output directory
+    (see `--job_desc`)
+
+###### Model and architecture options
 - `--model` *[default=mean_teacher]*: select the consistency model:
     - `mean_teacher` use the Mean Tecaher model of [Tarvainen et al.](https://arxiv.org/abs/1703.01780)
     - `pi` use the Pi-model of [Laine et al.](https://arxiv.org/abs/1610.02242)
@@ -38,6 +47,8 @@ and models and predictions will be saved to the directory `results/train_seg_sem
         [https://github.com/Britefury/semantic-segmentation-pytorch](https://github.com/Britefury/semantic-segmentation-pytorch)
 - `--freeze_bn`: flag to enable freezing of batch-norm layers. Use for DeepLab models, or for `resnet50unet_imagenet`
     if using a batch size of 1
+
+###### Learning rate and optimizer options
 - `--opt_type` *[default=adam]*: optimizer type; one of `sgd`, `adam` *[default]*
 - `--sgd_momentum` *[default=0.9]*: set momentum if using SGD optimizer 
 - `--sgd_nesterov`: flag to enable Nesterov momentum if using SGD optimizer 
@@ -53,9 +64,8 @@ and models and predictions will be saved to the directory `results/train_seg_sem
     change the learning rate at epochs 30, 60 and 80
 - `--lr_step_gamma` *[default=0.1]*: stepped LR schedule gamma; reduce the larning rate by this factor at each step
 - `--lr_poly_power` *[default=0.9]*: polynomial LR schedule gamma; scale learning rate by `p^(1-(iter/max_iters))`
-- `--teacher_alpha` *[default=0.99]*: EMA alpha used to update teacher network when using the mean teacher model 
-- `--bin_fill_holes`: flag to enable hole filling for foreground class. Only usable for binary segmentation
-    tasks e.g. ISIC 2017 segmentation. Used for ISIC 2017 experiments.
+
+###### Augmentation options
 - `--crop_size`: size of crop to extract during training, as `H,W` e.g. `--crop_size=321,321`. Should be provided.
 - `--aug_hflip`: augmentation: enable horizontal flip
 - `--aug_vflip`: augmentation: enable vertical flip
@@ -69,6 +79,22 @@ and models and predictions will be saved to the directory `results/train_seg_sem
     and `--aug_max_scale`)
 - `--aug_rot_mag` *[default=0.0]*: augmentation: random rotation magnitude in degrees; rotate by angle chosen
     from range `[-aug_rot_mag, aug_rot_mag]` (disabled by `--aug_scale_hung`)
+- `--aug_strong_colour`: augmentation: enable colour augmentation on strong/student side of consistency loss.
+    Colour augmentation consists of applying colour jitter -- with probability determined by the
+    `--aug_colour_prob` option -- that consists of jittering the brightness, contrast, saturation and hue
+    by the `--aug_colour_brightness`, `--aug_colour_contrast`, `--aug_colour_saturation` and
+    `--aug_colour_hue` settings respectively, followed by converting to greyscale with probability
+    `--aug_colour_greyscale_prob`. Replicates the procedure used in the
+    [MoCo model of He et al.](https://arxiv.org/abs/1911.05722) 
+- `--aug_colour_brightness` *[default=0.4]*: colour augmentation: brightness jitter strength
+- `--aug_colour_contrast` *[default=0.4]*: colour augmentation: contrast jitter strength
+- `--aug_colour_saturation` *[default=0.4]*: colour augmentation: saturation jitter strength
+- `--aug_colour_hue` *[default=0.1]*: colour augmentation: hue jitter strength
+- `--aug_colour_prob` *[default=0.8]*: colour augmentation: probability of colour jitter
+- `--aug_colour_greyscale_prob` *[default=0.2]*: colour augmentation: probability of greyscale
+
+###### Consistency loss and Mean Teacher options
+- `--teacher_alpha` *[default=0.99]*: EMA alpha used to update teacher network when using the mean teacher model 
 - `--cons_loss_fn`: consistency loss function:
     - `var` *[default for all experiments except VAT]* squared error between predicted probabilities
     - `bce`: binary cross entropy, using teacher predictions as target
@@ -87,10 +113,15 @@ and models and predictions will be saved to the directory `results/train_seg_sem
     [UDA by Xie et al.](https://arxiv.org/abs/1904.12848) and
     [FixMatch by Sohn et al.](https://arxiv.org/abs/2001.07685). Tests with CamVid yielded limited success for
     segmentation. We didn't try this with other datasets though.
+
+###### Batch size and training options
 - `--num_epochs` *[default=300]*: number of epochs to train for
 - `--iters_per_epoch` *[default=-1]*: number of iterations per epoch. If `-1` is given, it will be the number of
     mini-batches required to cover the training set
 - `--batch_size` *[default=10]*: the mini-batch size 
+- `--num_workers` *[default=4]*: the number of worker processes used to load data batches in the background
+
+###### Dataset split options
 - `--n_sup` *[default=100]*: the number of supervised samples to use during training. These will be randomly
     selected from the training set, using the random seed provided using `--split_seed` to initialise the
     RNG. Alternative, if `--split_path` is provided, the first `n_sup` samples will be selected
@@ -107,11 +138,6 @@ and models and predictions will be saved to the directory `results/train_seg_sem
 - `--split_path`: give the path of a pickle (`.pkl`) file from which an index array will be loaded.
     This index array will be used to select supervised and validation samples, rather than an RNG.
     Validation samples will be taken from the end, supervised samples from the start.
-- `--save_preds`: if enabled, after training the predictions for validation and test samples will be
-    saved in the output directory (see `--job_desc`)
-- `--save_model`: if enabled, after training the model will be saved in the output directory
-    (see `--job_desc`)
-- `--num_workers` *[default=4]*: the number of worker processes used to load data batches in the background
     
     
 

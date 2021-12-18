@@ -7,6 +7,8 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
                              learning_rate, lr_sched, lr_step_epochs, lr_step_gamma, lr_poly_power,
                              teacher_alpha, bin_fill_holes,
                              crop_size, aug_hflip, aug_vflip, aug_hvflip, aug_scale_hung, aug_max_scale, aug_scale_non_uniform, aug_rot_mag,
+                             aug_strong_colour, aug_colour_brightness, aug_colour_contrast, aug_colour_saturation, aug_colour_hue,
+                             aug_colour_prob, aug_colour_greyscale_prob,
                              vat_radius, adaptive_vat_radius, vat_dir_from_student,
                              cons_loss_fn, cons_weight, conf_thresh, conf_per_pixel, rampup, unsup_batch_ratio,
                              num_epochs, iters_per_epoch, batch_size,
@@ -20,6 +22,7 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
     import math
     import numpy as np
     import torch, torch.nn as nn, torch.nn.functional as F
+    import torchvision.transforms as tvt
     from architectures import network_architectures
     import torch.utils.data
     from datapipe import datasets
@@ -141,14 +144,31 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
     if aug_hflip or aug_vflip or aug_hvflip:
         train_transforms.append(
             seg_transforms_cv.SegCVTransformRandomFlip(aug_hflip, aug_vflip, aug_hvflip))
+
+    # Duplicate transforms so far for unsupervised path
+    train_unsup_transforms = train_transforms.copy()
+    # Flag indicating if the unsupervised batches are expected to be paired
+    unsup_paired = False
+    if aug_strong_colour:
+        colour_xforms = tvt.Compose([
+            tvt.RandomApply([
+                tvt.ColorJitter(aug_colour_brightness, aug_colour_contrast, aug_colour_saturation, aug_colour_hue)  # not strengthened
+            ], p=aug_colour_prob),
+            tvt.RandomGrayscale(p=aug_colour_greyscale_prob),
+        ])
+        train_unsup_transforms.append(seg_transforms.SegTransformToPair())
+        train_unsup_transforms.append(seg_transforms_cv.SegCVTransformTVT(colour_xforms))
+        unsup_paired = True
+
     train_transforms.append(seg_transforms_cv.SegCVTransformNormalizeToTensor(NET_MEAN, NET_STD))
+    train_unsup_transforms.append(seg_transforms_cv.SegCVTransformNormalizeToTensor(NET_MEAN, NET_STD))
 
     # Train data pipeline: supervised and unsupervised data sets
-    train_sup_ds = ds_src.dataset(labels=True, mask=False, xf=False, pair=False,
+    train_sup_ds = ds_src.dataset(labels=True, mask=False, xf=False,
                                   transforms=seg_transforms.SegTransformCompose(train_transforms),
                                   pipeline_type='cv')
-    train_unsup_ds = ds_src.dataset(labels=False, mask=True, xf=False, pair=False,
-                                    transforms=seg_transforms.SegTransformCompose(train_transforms),
+    train_unsup_ds = ds_src.dataset(labels=False, mask=True, xf=False,
+                                    transforms=seg_transforms.SegTransformCompose(train_unsup_transforms),
                                     pipeline_type='cv')
 
     collate_fn = seg_data.SegCollate(BLOCK_SIZE)
@@ -198,14 +218,14 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
         mag = torch.sqrt((x_flat * x_flat).sum(dim=1))
         return x / (mag[:, None, None, None]+1e-12)
 
-    def normalized_noise(x, requires_grad=False, scale=1.0):
+    def normalized_noise_like(x, requires_grad=False, scale=1.0):
         eps = torch.randn(x.shape, dtype=torch.float, device=x.device)
         eps = normalize_eps(eps) * scale
         if requires_grad:
             eps = eps.clone().detach().requires_grad_(True)
         return eps
 
-    def vat_direction(x):
+    def vat_direction(x, x_hat):
         """
         Compute the VAT perturbation direction vector
 
@@ -221,10 +241,10 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
 
         # Initial noise offset vector with requires_grad=True
         noise_scale = 1.0e-6 * x.shape[2] * x.shape[3] / 1000
-        eps = normalized_noise(x, requires_grad=True, scale=noise_scale)
+        eps = normalized_noise_like(x, requires_grad=True, scale=noise_scale)
 
         # Predict logits and probs for sample perturbed by eps
-        eps_pred_logits = vat_dir_net(x.detach() + eps)
+        eps_pred_logits = vat_dir_net(x_hat.detach() + eps)
         eps_pred_prob = F.softmax(eps_pred_logits, dim=1)
 
         # Choose our loss function
@@ -251,8 +271,8 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
         return normalize_eps(eps_adv), y_pred_logits, y_pred_prob
 
 
-    def vat_perburbation(x, m):
-        eps_adv_nrm, y_pred_logits, y_pred_prob = vat_direction(x)
+    def vat_perburbation(x, x_hat, m):
+        eps_adv_nrm, y_pred_logits, y_pred_prob = vat_direction(x, x_hat)
 
         if adaptive_vat_radius:
             # We view semantic segmentation as predicting the class of a pixel
@@ -265,8 +285,8 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
             # so we can scale the VAT radius according to the image content.
 
             # Delta in vertical and horizontal directions
-            delta_v = x[:, :, 2:, :] - x[:, :, :-2, :]
-            delta_h = x[:, :, :, 2:] - x[:, :, :, :-2]
+            delta_v = x_hat[:, :, 2:, :] - x_hat[:, :, :-2, :]
+            delta_h = x_hat[:, :, :, 2:] - x_hat[:, :, :, :-2]
 
             # delta_h and delta_v are the difference between pixels where the step size is 2, rather than 1
             # So divide by 2 to get the magnitude of the Jacobian
@@ -275,7 +295,7 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
             delta_h = delta_h.view(len(delta_h), -1)
             adv_radius = vat_radius * torch.sqrt((delta_v**2).sum(dim=1) + (delta_h**2).sum(dim=1))[:, None, None, None] * 0.5
         else:
-            scale = math.sqrt(float(x.shape[1] * x.shape[2] * x.shape[3]))
+            scale = math.sqrt(float(x_hat.shape[1] * x_hat.shape[2] * x_hat.shape[3]))
             adv_radius = vat_radius * scale
 
         return (eps_adv_nrm * adv_radius).detach(), y_pred_logits, y_pred_prob
@@ -349,8 +369,18 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
                     unsup_batch = next(train_unsup_iter)
 
                     # Input images to torch tensor
-                    batch_ux = unsup_batch['image'].to(torch_device)
-                    batch_um = unsup_batch['mask'].to(torch_device)
+                    if unsup_paired:
+                        # The teacher path should come from sample 0 that has weaker
+                        # augmentation (no colour augmentation), where the student should
+                        # use sample 1 that has stronger augmentation
+
+                        batch_ux_tea = unsup_batch['sample0']['image'].to(torch_device)
+                        batch_ux_stu = unsup_batch['sample1']['image'].to(torch_device)
+                        batch_um = unsup_batch['sample0']['mask'].to(torch_device)
+                    else:
+                        batch_ux_tea = unsup_batch['image'].to(torch_device)
+                        batch_ux_stu = batch_ux_tea
+                        batch_um = unsup_batch['mask'].to(torch_device)
 
                     # batch_um is a mask that is 1 for valid pixels, 0 for invalid pixels.
                     # It us used later on to scale the consistency loss, so that consistency loss is
@@ -365,14 +395,14 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
                     # of 0 in these masks.
 
                     # Compute VAT perburbation
-                    x_perturb, logits_cons_tea, prob_cons_tea = vat_perburbation(batch_ux, batch_um)
+                    x_perturb, logits_cons_tea, prob_cons_tea = vat_perburbation(batch_ux_tea, batch_ux_stu, batch_um)
 
                     # Perturb image
-                    batch_ux_adv = batch_ux + x_perturb
+                    batch_ux_adv = batch_ux_stu + x_perturb
 
                     # Get teacher predictions for original image
                     with torch.no_grad():
-                        logits_cons_tea = teacher_net(batch_ux).detach()
+                        logits_cons_tea = teacher_net(batch_ux_tea).detach()
                     # Get student prediction for cut image
                     logits_cons_stu = student_net(batch_ux_adv)
 
@@ -535,6 +565,10 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
         with torch.no_grad():
             for batch in test_loader:
                 batch_x = batch['image'].to(torch_device)
+                if 'labels' in batch:
+                    batch_y = batch['labels'].numpy()
+                else:
+                    batch_y = None
                 batch_ndx = batch['index'].numpy()
 
                 logits = eval_net(batch_x)
@@ -543,7 +577,8 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
                 for sample_i, sample_ndx in enumerate(batch_ndx):
                     if save_preds:
                         ds_tgt.save_prediction_by_index(out_dir, pred_y[sample_i].astype(np.uint32), sample_ndx)
-                    test_iou_eval.sample(batch_y[sample_i, 0], pred_y[sample_i], ignore_value=255)
+                    if batch_y is not None:
+                        test_iou_eval.sample(batch_y[sample_i, 0], pred_y[sample_i], ignore_value=255)
 
         test_iou = test_iou_eval.score()
         test_miou = test_iou.mean()
@@ -579,6 +614,13 @@ def train_seg_semisup_vat_mt(submit_config: job_helper.SubmitConfig, dataset, mo
 @click.option('--aug_max_scale', type=float, default=1.0)
 @click.option('--aug_scale_non_uniform', is_flag=True, default=False)
 @click.option('--aug_rot_mag', type=float, default=0.0)
+@click.option('--aug_strong_colour', is_flag=True, default=False)
+@click.option('--aug_colour_brightness', type=float, default=0.4)
+@click.option('--aug_colour_contrast', type=float, default=0.4)
+@click.option('--aug_colour_saturation', type=float, default=0.4)
+@click.option('--aug_colour_hue', type=float, default=0.1)
+@click.option('--aug_colour_prob', type=float, default=0.8)
+@click.option('--aug_colour_greyscale_prob', type=float, default=0.2)
 @click.option('--vat_radius', type=float, default=0.5)
 @click.option('--adaptive_vat_radius', is_flag=True, default=False)
 @click.option('--vat_dir_from_student', is_flag=True, default=False)
@@ -605,6 +647,8 @@ def experiment(job_desc, dataset, model, arch, freeze_bn,
                learning_rate, lr_sched, lr_step_epochs, lr_step_gamma, lr_poly_power,
                teacher_alpha, bin_fill_holes,
                crop_size, aug_hflip, aug_vflip, aug_hvflip, aug_scale_hung, aug_max_scale, aug_scale_non_uniform, aug_rot_mag,
+               aug_strong_colour, aug_colour_brightness, aug_colour_contrast, aug_colour_saturation, aug_colour_hue,
+               aug_colour_prob, aug_colour_greyscale_prob,
                vat_radius, adaptive_vat_radius, vat_dir_from_student,
                cons_loss_fn, cons_weight, conf_thresh, conf_per_pixel, rampup, unsup_batch_ratio,
                num_epochs, iters_per_epoch, batch_size,

@@ -14,7 +14,7 @@ n_sup_txt=${2}
 PARAMS_PASCALAUG_DEEPLAB3PLUSI="--dataset=pascal_aug --arch=resnet101_deeplabv3plus_imagenet --freeze_bn --batch_size=10 --learning_rate=1e-5 --iters_per_epoch=1000 --num_epochs=40 --split_path=./data/splits/pascal_aug/split_0.pkl"
 
 # Pascal VOC 2012 augmentation settings
-AUG_PASCAL="--crop_size=321,321 --aug_hflip --aug_scale_hung"
+AUG_PASCAL="--crop_size=321,321 --aug_hflip --aug_scale_hung --aug_strong_colour"
 
 # Pascal VOC 2012 semi-supervised regularizers
 REG_SUPERVISED="--cons_weight=0.0"

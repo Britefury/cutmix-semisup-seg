@@ -11,9 +11,25 @@ class SegTransform (object):
     except there are two modes:
     - transform a single image
     - transform a paired image with different augmentation parameters
-      for augmentation driven consistency regularization
-    A method is provided for each mode.
+      for augmentation driven consistency regularization.
+    We separate the two modes so that when transforming pairs, geometric
+    augmentation parameters can be chosen such that e.g. crops overlap,
+    in order to ensure that there are image regions common to both
+    crops/elements of the pair, to ensure that consistency loss can be computed.
+    A paired sample is a dictionary of the form `{'sample0': <sample 0>,
+    'sample1': <sample 1>}; where a single sample (or member of a
+    pair) will have keys such as 'image', 'mask', 'labels', 'xf'.
+    The `transform` method determines which mode to use and delegates
+    to the `transform_single` or `transform_pair` methods as appropriate.
     """
+    def apply(self, sample):
+        if 'sample0' in sample and 'sample1' in sample:
+            # Its a pair
+            s0, s1 = self.transform_pair(sample['sample0'], sample['sample1'])
+            return dict(sample0=s0, sample1=s1)
+        else:
+            return self.transform_single(sample)
+
     def transform_single(self, sample):
         raise NotImplementedError
 
@@ -21,7 +37,7 @@ class SegTransform (object):
         return (self.transform_single(sample0), self.transform_single(sample1))
 
 
-class SegTransformCompose (SegTransform):
+class SegTransformCompose (object):
     """
     Segmentation transform compose
 
@@ -30,15 +46,23 @@ class SegTransformCompose (SegTransform):
     def __init__(self, transforms):
         self.transforms = transforms
 
-    def transform_single(self, seg_img0):
+    def apply(self, sample):
         for t in self.transforms:
-            seg_img0 = t.transform_single(seg_img0)
-        return seg_img0
+            sample = t.apply(sample)
+        return sample
+
+
+class SegTransformToPair (SegTransform):
+    """
+    Convert a single sample to a paired sample
+    """
+    def transform_single(self, sample):
+        sample0 = sample
+        sample1 = sample0.copy()
+        return dict(sample0=sample0, sample1=sample1)
 
     def transform_pair(self, sample0, sample1):
-        for t in self.transforms:
-            sample0, sample1 = t.transform_pair(sample0, sample1)
-        return sample0, sample1
+        raise TypeError('Cannot split a paired sample into pairs again')
 
 
 def get_mean_std(ds, net):

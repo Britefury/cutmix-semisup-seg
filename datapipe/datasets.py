@@ -91,7 +91,7 @@ def eval_data_pipeline(ds_src, ds_tgt, src_val_ndx, tgt_val_ndx, test_ndx,
     eval_transform = seg_transforms_cv.SegCVTransformNormalizeToTensor(mean, std)
 
     if ds_src is not ds_tgt:
-        src_eval_ds = ds_src.dataset(labels=True, mask=False, xf=False, pair=False,
+        src_eval_ds = ds_src.dataset(labels=True, mask=False, xf=False,
                                      transforms=eval_transform,
                                      pipeline_type='cv')
         src_val_loader = torch.utils.data.DataLoader(torch.utils.data.Subset(src_eval_ds, src_val_ndx),
@@ -100,7 +100,7 @@ def eval_data_pipeline(ds_src, ds_tgt, src_val_ndx, tgt_val_ndx, test_ndx,
     else:
         src_val_loader = None
 
-    tgt_eval_ds = ds_tgt.dataset(labels=True, mask=False, xf=False, pair=False,
+    tgt_eval_ds = ds_tgt.dataset(labels=True, mask=False, xf=False,
                                  transforms=eval_transform,
                                  pipeline_type='cv', include_indices=True)
     tgt_val_loader = torch.utils.data.DataLoader(torch.utils.data.Subset(tgt_eval_ds, tgt_val_ndx),
